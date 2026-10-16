@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "NetEase Lyrics Layer",
+    "description": "Renders NetEase Cloud Music lyrics between the wallpaper and the chat: hooks the desktop-lyrics window, pairs original/translation lines, with four display modes and ten randomized effects."
+  }
+}

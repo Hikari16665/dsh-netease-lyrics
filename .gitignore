@@ -1,0 +1,19 @@
+# 构建产物 / 依赖（只忽略根目录的 node_modules；
+# vendor/ 下的随包副本必须提交，那是发布内容的一部分）
+/node_modules/
+bin-src/*.obj
+bin-src/*.exe
+bin-src/*.pdb
+bin-src/*.ilk
+
+# 运行期产物（helper 与被注入 DLL 会写日志；共享内存不落盘）
+*.log
+lyrichook.log
+poc_out.log
+
+# 编辑器 / 系统
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
+*.tmp

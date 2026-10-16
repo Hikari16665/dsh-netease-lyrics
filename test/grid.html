@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>dsh-netease-lyrics 效果总览</title>
+<style>
+  html,body{margin:0;height:100%;background:#0b0b0d;overflow:hidden;
+    font-family:"Microsoft YaHei",system-ui,sans-serif}
+  :root{
+    --dsw-alias-label-primary:#f2f3f5;--dsw-alias-label-secondary:#a8adb8;
+    --dsw-alias-bg-layer-1:#151517;--dsw-alias-bg-layer-2:#1b1b1e;
+    --dsw-alias-border-l1:rgba(255,255,255,.14);
+    --dsw-font-family:"Microsoft YaHei",system-ui,sans-serif;
+  }
+  #grid{display:grid;grid-template-columns:repeat(5,1fr);grid-template-rows:repeat(2,1fr);
+    gap:1px;background:#232326;height:100%;box-sizing:border-box}
+  .cell{position:relative;overflow:hidden;background:#0b0b0d}
+  .cell > .cap{position:absolute;left:6px;top:4px;z-index:9;font:11px/1.4 monospace;color:#7d8490}
+  /* 把固定定位的歌词层关进单元格里 */
+  .cell .dnl-layer{position:absolute !important;inset:0 !important;z-index:2 !important}
+  .cell .dnl-ui{position:absolute !important;inset:0 !important;z-index:3 !important}
+  .cell .dnl-gear,.cell .dnl-hint{display:none !important}
+  .cell .dnl-slot{--dnl-size:clamp(14px,1.5vw,26px) !important}
+</style>
+</head>
+<body>
+<div id="grid"></div>
+<script>
+  window.__ModuleLoader__ = { load: (def) => { window.__DEF__ = def; } };
+  window.__pageErrors = [];
+  window.addEventListener('error', (e) => window.__pageErrors.push(String(e.message)));
+
+  const q = new URLSearchParams(location.search);
+  const EFFECTS = ['karaoke','typewriter','blurReveal','neonPulse','tilt3d','rain','marquee','orbit','glassCard','gradientSweep'];
+  const PALETTES = [
+    ['#7ef0d0','#5b8cff','#c77dff'], ['#ffb37b','#ff6b9d','#ffd76b'], ['#9fe8ff','#5b6bff','#e8f6ff'],
+    ['#ff8f5e','#ff4d6d','#ffd166'], ['#a8e063','#56ab2f','#e6ffcc'], ['#f2f3f5','#b9c0cc','#f2f3f5'],
+  ];
+  const line = q.get('line') || '爱立刻2000 我立刻出现';
+  const trans = q.get('trans') || '爱你我就立刻出现';
+  const span = Number(q.get('span') || 4000);
+  const el = Number(q.get('el') || 1500);
+  const mode = q.get('mode') || 'stacked';
+
+  const grid = document.getElementById('grid');
+  const cells = EFFECTS.map((fx, i) => {
+    const cell = document.createElement('div');
+    cell.className = 'cell';
+    const cap = document.createElement('div');
+    cap.className = 'cap';
+    cap.textContent = `${i + 1}. ${fx}`;
+    cell.appendChild(cap);
+    grid.appendChild(cell);
+    return cell;
+  });
+
+  // 每个效果一个独立插件实例：payload 固定，只是 effectPool 不同
+  const startedAt = Date.now();
+  let idx = 0;
+  function makePayload(fx) {
+    const pal = PALETTES[EFFECTS.indexOf(fx) % PALETTES.length];
+    return {
+      track: { raw: '爱立刻2000 - 天秤DAV', song: '爱立刻2000', artist: '天秤DAV' },
+      channel: { state: 'attached', desktopLyrics: 1, visible: 1 },
+      inject: { status: 'skipped', message: '' },
+      lyric: {
+        index: 1,
+        original: { text: line, ts: '' },
+        translation: trans ? { text: trans, ts: '' } : null,
+        confidence: 'high',
+        startTs: startedAt - el, endTs: startedAt - el + span, switchAt: startedAt - el + span / 2, split: 0.5,
+      },
+      config: {
+        enabled: true, zIndex: 2, effectPool: [fx], reshuffle: 'song',
+        band: q.get('band') || 'middle', align: q.get('align') || 'center',
+        fontScale: 1, opacity: 1, unsungAlpha: Number(q.get('unsung') || 0.68),
+        showTrackTitle: q.get('title') === '1', idleFadeSec: 0, pairMode: mode, glassMode: 'off',
+        autoGlide: false, respectReducedMotion: q.get('calm') === '1', enterMs: 280, filterPatterns: [],
+        __palette: pal,
+      },
+      pluginVersion: '0.2.0',
+    };
+  }
+
+  const payloads = new Map();
+  EFFECTS.forEach((fx) => payloads.set(fx, makePayload(fx)));
+
+  // 每个实例的 fetch 需要知道"当前是谁"：用 effectPool 反查 payload
+  const realFetch = window.fetch;
+  window.fetch = async (url, opts) => {
+    if (String(url).includes('/state')) {
+      const fx = window.__currentFx;
+      return { ok: true, json: async () => payloads.get(fx) };
+    }
+    return { ok: realFetch ? realFetch(url, opts) : Promise.resolve({ ok: true, json: async () => ({}) }) };
+  };
+  window.EventSource = class { constructor() {} addEventListener() {} close() {} };
+
+  const s = document.createElement('script');
+  s.src = '../client.js';
+  s.onload = () => {
+    // client.js 只会 load 一次（__DEF__ 拿到定义），但 apply 可以跑多次 ——
+    // 每次 apply 前切换 __currentFx，并把新建的层搬进对应单元格
+    const def = window.__DEF__;
+    EFFECTS.forEach((fx, i) => {
+      window.__currentFx = fx;
+      const before = new Set(document.body.children);
+      try {
+        def.factory(() => { throw new Error('渲染台不提供平台模块'); }).apply({
+          logger: { info() {}, warn() {} },
+          effect: (f) => { const d = f(); return () => { if (typeof d === 'function') d(); }; },
+        });
+      } catch (err) { window.__pageErrors.push(fx + ': ' + (err && err.message || err)); }
+      // 新出现的同级元素（layer / ui）搬进单元格
+      [...document.body.children].filter((el2) => !before.has(el2) && (el2.classList.contains('dnl-layer') || el2.classList.contains('dnl-ui')))
+        .forEach((el2) => cells[i].appendChild(el2));
+    });
+    window.__gridReady = true;
+  };
+  s.onerror = () => window.__pageErrors.push('client.js 加载失败');
+  document.body.appendChild(s);
+</script>
+</body>
+</html>

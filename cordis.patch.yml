@@ -1,0 +1,14 @@
+# dsh-netease-lyrics bundle patch
+#
+# Applied over the dsh-web-app layer. This bundle contributes ONE host row
+# (watches the NetEase desktop-lyrics channel, pairs original/translation lines,
+# and serves /dsh-netease-lyrics/{state,stream,inject,reveal} over the same-origin
+# web server) and relies on its `dsh.client` manifest to load the browser half
+# that renders the lyrics layer between the wallpaper and the chat.
+#
+# A patch replaces the targeted row's whole `config`, so only additive `insert`
+# rows appear here (existing shipped rows are never overridden).
+
+- insert:
+    - id: netease-lyrics
+      name: 'dsh-netease-lyrics'

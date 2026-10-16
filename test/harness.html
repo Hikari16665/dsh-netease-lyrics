@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>dsh-netease-lyrics 离线渲染台</title>
+<style>
+  html,body{margin:0;height:100%;background:#0b0b0d;overflow:hidden}
+  /* 模拟 DSH 深色主题的令牌（真实页面由宿主注入） */
+  :root{
+    --dsw-alias-label-primary:#f2f3f5;
+    --dsw-alias-label-secondary:#a8adb8;
+    --dsw-alias-bg-layer-1:#151517;
+    --dsw-alias-bg-layer-2:#1b1b1e;
+    --dsw-alias-border-l1:rgba(255,255,255,.14);
+    --dsw-font-family:"Microsoft YaHei",system-ui,sans-serif;
+  }
+  #note{position:fixed;left:8px;top:8px;color:#6c7280;font:12px/1.5 monospace;z-index:99999}
+</style>
+</head>
+<body>
+<div id="note"></div>
+<script>
+  // ── 1) 平台模块表桩：捕获插件定义 ──
+  window.__ModuleLoader__ = { load: (def) => { window.__DEF__ = def; } };
+  window.__pageErrors = [];
+  window.addEventListener('error', (e) => window.__pageErrors.push(String(e.message)));
+
+  // ── 2) /state 桩：可指定效果、进度、原文/译文 ──
+  const q = new URLSearchParams(location.search);
+  const fx = q.get('fx') || 'glassCard';
+  const spanMs = Number(q.get('span') || 4000);
+  const elapsed = Number(q.get('el') || 1200);      // 句子已过去多少毫秒
+  const mode = q.get('mode') || 'stacked';
+  const line = q.get('line') || '爱立刻2000 我立刻出现';
+  const trans = q.get('trans') || '爱你我就立刻出现';
+  const now = Date.now();
+  const payload = {
+    track: { raw: '爱立刻2000 - 天秤DAV', song: '爱立刻2000', artist: '天秤DAV' },
+    channel: { state: 'attached', desktopLyrics: 1, visible: 1 },
+    inject: { status: 'skipped', message: '' },
+    lyric: {
+      index: 1,
+      original: { text: line, ts: '' },
+      translation: trans ? { text: trans, ts: '' } : null,
+      confidence: 'high', startTs: now - elapsed, endTs: now - elapsed + spanMs, switchAt: now - elapsed + spanMs / 2, split: 0.5,
+    },
+    config: {
+      enabled: true, zIndex: 1, effectPool: [fx], reshuffle: 'song', band: q.get('band') || 'middle',
+      align: q.get('align') || 'center', fontScale: 1, opacity: 1, unsungAlpha: Number(q.get('unsung') || 0.68),
+      showTrackTitle: q.get('title') !== '0', idleFadeSec: 0, pairMode: mode, glassMode: 'off',
+      autoGlide: false, respectReducedMotion: q.get('calm') === '1', enterMs: Number(q.get('enter') || 280),
+      filterPatterns: [],
+    },
+    pluginVersion: '0.2.0',
+  };
+  document.getElementById('note').textContent = `fx=${fx} el=${elapsed}ms span=${spanMs}ms mode=${mode}`;
+
+  window.fetch = async (u) => (String(u).includes('/state')
+    ? { ok: true, json: async () => payload }
+    : { ok: true, json: async () => ({ ok: true }) });
+  window.EventSource = class { constructor() {} addEventListener() {} close() {} };
+
+  // ── 3) 加载真实 client.js ──
+  const s = document.createElement('script');
+  s.src = '../client.js';
+  s.onload = () => {
+    try {
+      const mod = window.__DEF__.factory(() => { throw new Error('离线渲染台不提供平台模块'); });
+      mod.apply({ logger: { info() {}, warn() {} }, effect: (f) => { const d = f(); return () => { if (typeof d === 'function') d(); }; } });
+    } catch (err) { window.__pageErrors.push(String(err && err.message || err)); }
+  };
+  s.onerror = () => window.__pageErrors.push('client.js 加载失败');
+  document.body.appendChild(s);
+</script>
+</body>
+</html>

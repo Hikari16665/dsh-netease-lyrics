@@ -1,0 +1,62 @@
+{
+  "name": "dsh-netease-lyrics",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "网易云歌词背景层：hook 桌面歌词窗口取词，在壁纸层与聊天层之间渲染随机特效歌词（含原文/译文配对四种显示模式）。",
+  "keywords": ["dsh", "dsh-plugin", "deepseek-harness", "netease", "lyrics", "background-layer"],
+  "license": "MIT",
+  "author": "Eventully <contact@hikari.bond>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Hikari16665/dsh-netease-lyrics.git"
+  },
+  "homepage": "https://github.com/Hikari16665/dsh-netease-lyrics#readme",
+  "bugs": {
+    "url": "https://github.com/Hikari16665/dsh-netease-lyrics/issues"
+  },
+  "icon": "./icon.svg",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json"
+  },
+  "dependencies": {
+    "schemastery": "^3.18.0"
+  },
+  "scripts": {
+    "test": "node test/pairing.test.mjs && node test/inject-policy.test.mjs && node test/client.test.mjs && node test/host.test.mjs",
+    "test:pairing": "node test/pairing.test.mjs",
+    "test:policy": "node test/inject-policy.test.mjs",
+    "test:client": "node test/client.test.mjs",
+    "test:host": "node test/host.test.mjs"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "pairing.js",
+    "inject-policy.js",
+    "vendor",
+    "bin",
+    "bin-src",
+    "docs",
+    "icon.svg",
+    "locale",
+    "cordis.patch.yml",
+    "LICENSE",
+    "README.md"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": ["@deepseek-ai/dsh-client-runtime"]
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
