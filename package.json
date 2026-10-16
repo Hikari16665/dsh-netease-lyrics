@@ -45,7 +45,8 @@
     "cordis.patch.yml",
     "LICENSE",
     "THIRD-PARTY.md",
-    "README.md"
+    "README.md",
+    "DEVELOPING.md"
   ],
   "dsh": {
     "bundle": {
