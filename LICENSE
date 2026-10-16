@@ -19,17 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
----
-
-Third-party components:
-
-- bin/lyrichook64.dll statically links MinHook (https://github.com/TsudaKageyu/minhook),
-  Copyright (c) 2009-2017 Tsuda Kageyu, MIT License. The DLL itself is built from
-  bin-src/lyricstream.c and the hook sources in this repository's history; the
-  injector (bin/inject.exe) and helper (bin/lyricstream.exe) are built from the
-  C sources shipped here.
-- vendor/schemastery is a bundled copy of schemastery 3.18.0 (MIT),
-  and vendor/schemastery/node_modules/cosmokit is a bundled copy of cosmokit (MIT).
-  They exist only as a runtime fallback for link-installed profiles; the declared
-  dependency in package.json is the primary source.

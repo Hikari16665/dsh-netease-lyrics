@@ -62,7 +62,8 @@ const fakeReq = (method = 'GET', body = null) => ({
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-let pass = 0, fail = 0;
+let pass = 0, fail = 0, skipped = 0;
+const skip = (name, why) => { skipped++; console.log(`  --  跳过 ${name}：${why}`); };
 const check = (name, cond, extra = '') => {
   if (cond) { pass++; console.log(`  ok  ${name}`); }
   else { fail++; console.log(`FAIL  ${name} ${extra}`); }
@@ -103,7 +104,9 @@ for (let i = 0; i < 30; i++) {
   const s = JSON.parse(rs.chunks.join(''));
   if (s.lyric) { lyricSeen = s; break; }
 }
-if (lyricSeen) { pass++; console.log('  ok  拿到歌词槽'); } else { console.log('  --  跳过：30 秒内没有新歌词（当前曲目可能是纯音乐/已暂停），非代码问题'); }
+const noLyric = '30 秒内没有新歌词（当前曲目可能是纯音乐/已暂停），非代码问题';
+if (lyricSeen) { pass++; console.log('  ok  拿到歌词槽'); } else skip('拿到歌词槽', noLyric);
+if (!lyricSeen) { skip('槽里有 startTs/endTs', noLyric); skip('recent 至少一条', noLyric); }
 if (lyricSeen) {
   console.log(`       lyric: "${lyricSeen.lyric.original.text}"` + (lyricSeen.lyric.translation ? ` / "${lyricSeen.lyric.translation.text}" (${lyricSeen.lyric.confidence})` : ''));
   check('槽里有 startTs/endTs', Number.isFinite(lyricSeen.lyric.startTs) && lyricSeen.lyric.endTs > lyricSeen.lyric.startTs);
@@ -192,5 +195,5 @@ for (const d of disposers) { try { d(); } catch {} }
 await sleep(800);
 check('dispose 后路由清空', routes.size === 0, `实际 ${routes.size}`);
 
-console.log(`\n通过 ${pass} 项，失败 ${fail} 项`);
+console.log(`\n通过 ${pass} 项，失败 ${fail} 项` + (skipped ? `（跳过 ${skipped} 项：依赖网易云正在播放歌词）` : ""));
 process.exit(fail ? 1 : 0);

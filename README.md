@@ -189,8 +189,10 @@ bin-src/          C 源码（lyricstream.c，可用 build.cmd 重新构建）
 docs/effects.png  十个效果的实拍总览
 vendor/           schemastery + cosmokit 的随包副本（正式依赖是 package.json 里的 schemastery，
                   装不上时自动回落，保证 link 安装方式下也能启动）
-test/             四套测试，共 154 项断言 + 两个离线渲染台
-LICENSE           MIT（含第三方组件声明）
+test/             四套测试，最多 154 项断言（其中 3 项依赖网易云正在播放歌词，
+                  没播放时自动跳过并在汇总里报出来）+ 两个离线渲染台
+LICENSE           MIT
+THIRD-PARTY.md    随包分发的第三方组件（MinHook / schemastery / cosmokit）
 ```
 
 ![十个效果总览](docs/effects.png)
@@ -200,11 +202,11 @@ LICENSE           MIT（含第三方组件声明）
 或 `test/grid.html`（十个效果一次渲染成网格）。真机截图排查出来的几个渲染问题都是靠它定位的。
 
 ```powershell
-npm test                            # 跑全部四套（154 项断言）
+npm test                            # 跑全部四套（最多 154 项断言）
 node test/pairing.test.mjs        # 18 项：配对状态机（真机回放、歌名卡片回溯过滤）
 node test/inject-policy.test.mjs  # 14 项：注入时机、冷却、僵尸通道判定
 node test/client.test.mjs         # 92 项：四种 pairMode、效果轮换、缓动滑动、逐字可读性、快歌适配、减少动态、玻璃化、齿轮面板、回收
-node test/host.test.mjs           # 30 项：真实 helper、路由、SSE、配置接口与校验、回收
+node test/host.test.mjs           # 30 项：真实 helper、路由、SSE、配置接口与校验、回收（无播放时 3 项跳过）
 ```
 
 ## 发布
@@ -219,5 +221,5 @@ node test/host.test.mjs           # 30 项：真实 helper、路由、SSE、配�
 
 ## 许可
 
-插件本体 MIT，详见 [LICENSE](LICENSE)。`bin/lyrichook64.dll` 内含 [MinHook](https://github.com/TsudaKageyu/minhook)（MIT）；
-`vendor/` 下的 schemastery 与 cosmokit 亦为 MIT，来源与升级方式见 [vendor/README.md](vendor/README.md)。
+插件本体 MIT，详见 [LICENSE](LICENSE)。随包分发的第三方组件（MinHook、schemastery、cosmokit，均为 MIT）
+的来源与位置见 [THIRD-PARTY.md](THIRD-PARTY.md)，升级 vendored 副本的方法见 [vendor/README.md](vendor/README.md)。
