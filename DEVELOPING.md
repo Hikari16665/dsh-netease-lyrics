@@ -8,8 +8,7 @@
    网易云的桌面歌词窗口是把**整句文字转成 GDI+ 路径**再描边渲染的，所以在文字进入渲染管线那一刻就能拿到原文，
    不必碰网易云的网络接口、播放状态或歌词缓存。过滤条件是「同一线程 + 窗口类名 `DesktopLyrics`」。
 2. **回传**：DLL 把 `YYYY-MM-DD HH:MM:SS\n歌词` 写进 `Local\NeteaseLyricsBuffer`（64 KiB）并 `SetEvent`
-   `Local\NeteaseLyricsEvent` —— 与 JackalClient 的 `JDLyrics64.dll` 同通道同格式，所以谁在写都能读；
-   JackalClient 已经注入过时，本插件只读附加、不重复注入。
+   `Local\NeteaseLyricsEvent`
 3. **配对**：原文与译文是两次独立调用、发送端时间戳相同（真机实测），且原文先、译文后。
    host 侧按「到达时间差 ≤ `pairWindowMs` 且时间戳一致」配对，并用脚本差异（假名/拉丁 vs 汉字）判定置信度。
 4. **渲染**：client 侧在 body 上挂一个 `position:fixed; z-index:-1` 的层。
