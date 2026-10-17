@@ -57,6 +57,8 @@ export const Config = Schema.object({
   opacity: Schema.number().min(0.1).max(1).step(0.05).default(0.85).description('歌词层整体不透明度'),
   unsungAlpha: Schema.number().min(0.15).max(1).step(0.01).default(0.68)
     .description('逐字效果里「还没唱到」部分的亮度；调太低会只剩第一个字看得见'),
+  moveDebounceMs: Schema.number().min(0).max(2000).step(50).default(500)
+    .description('相邻两句间隔小于该值时不平移、不换效果，只原地换字（防止连词/快歌时反复移动）'),
   enterMs: Schema.number().min(120).max(1200).step(20).default(280)
     .description('入场动画时长；会自动压缩到句长的 35% 以内，避免快歌整句都在入场'),
   showTrackTitle: Schema.boolean().default(false).description('在歌词下方显示「歌名 - 歌手」'),
@@ -360,7 +362,7 @@ export function apply(ctx, config) {
       zIndex: cfg.zIndex, effectPool: cfg.effectPool, reshuffle: cfg.reshuffle,
       autoGlide: cfg.autoGlide, glideMs: cfg.glideMs,
       band: cfg.band, align: cfg.align, fontScale: cfg.fontScale, opacity: cfg.opacity,
-      unsungAlpha: cfg.unsungAlpha, enterMs: cfg.enterMs,
+      unsungAlpha: cfg.unsungAlpha, enterMs: cfg.enterMs, moveDebounceMs: cfg.moveDebounceMs,
       showTrackTitle: cfg.showTrackTitle, idleFadeSec: cfg.idleFadeSec,
       respectReducedMotion: cfg.respectReducedMotion,
       pairMode: cfg.pairMode, pairWindowMs: cfg.pairWindowMs, pairSameScript: cfg.pairSameScript,

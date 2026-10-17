@@ -487,6 +487,9 @@ body:not([data-ds-dark-theme]) .dnl-slot{--dnl-shadow:0 2px 24px rgba(255,255,25
             range('玻璃强度', 'glassStrength', 0, 1, 0.05, (v) => `${Math.round(v * 100)}%`),
             range('字号', 'fontScale', 0.6, 2, 0.05, (v) => `${v.toFixed(2)}×`),
             range('不透明度', 'opacity', 0.1, 1, 0.05, (v) => `${Math.round(v * 100)}%`),
+            range('未唱部分亮度', 'unsungAlpha', 0.15, 1, 0.01, (v) => `${Math.round(v * 100)}%`),
+            range('入场时长', 'enterMs', 120, 1200, 20, (v) => `${v} ms`),
+            range('短句防抖', 'moveDebounceMs', 0, 2000, 50, (v) => (v ? `${v} ms` : '关')),
             range('无歌词淡出', 'idleFadeSec', 0, 60, 1, (v) => (v ? `${v} 秒` : '不淡出')),
             seg('显示歌名', 'showTrackTitle', [[true, '开'], [false, '关']]),
             seg('跟随系统「减少动态」', 'respectReducedMotion', [[true, '跟随'], [false, '忽略']]),
@@ -583,6 +586,7 @@ body:not([data-ds-dark-theme]) .dnl-slot{--dnl-shadow:0 2px 24px rgba(255,255,25
       let dx = 0, dy = 0;                  // 当前位移（px）
       let glide = null;                    // { fromX, fromY, toX, toY, t0, dur, ease, name }
       let lastAnchorKey = '';              // 已应用的目标锚点，用于判断要不要滑
+      let glideCount = 0;                   // 本层启动过多少次滑动（排查用）
 
       /** 量出目标锚点相对"居中"位置的像素偏移 */
       function measureTarget(band, align) {
@@ -623,6 +627,8 @@ body:not([data-ds-dark-theme]) .dnl-slot{--dnl-shadow:0 2px 24px rgba(255,255,25
         const name = EASING_NAMES[(seed >>> 3) % EASING_NAMES.length];
         glide = { fromX: dx, fromY: dy, toX: to.x, toY: to.y, t0: performance.now(), dur: Math.max(200, Number(cfg.glideMs) || 900), ease: EASINGS[name], name };
         glideEl.dataset.ease = name;
+        // 启动计数：便于排查"到底滑了几次"（短句防抖生效时这个数不会涨）
+        glideEl.dataset.glides = String(++glideCount);
         lastAnchorKey = key;
         if (slot.dataset.calm === '1' || reducedMotion() && cfg.respectReducedMotion !== false) {
           // 收敛动效：直接落位
@@ -676,6 +682,14 @@ body:not([data-ds-dark-theme]) .dnl-slot{--dnl-shadow:0 2px 24px rgba(255,255,25
       let entranceAt = 0;
       let lyricRef = null;
       let shownTranslation = false;
+      let lastUnitAt = 0;        // 上一次"换字"的到达时刻（ms）
+      let lastUnitStartTs = NaN;  // 上一次"换字"那句的 startTs
+
+      /** 短间隔防抖：相邻两句来得太快时，不换位置也不换样式，只原地换字 */
+      function moveDebounce(cfg) {
+        const v = Number(cfg?.moveDebounceMs);
+        return Number.isFinite(v) ? Math.max(0, v) : 500;
+      }
 
       function setVars(el, vars) { for (const k in vars) el.style.setProperty(k, vars[k]); }
 
@@ -720,23 +734,38 @@ body:not([data-ds-dark-theme]) .dnl-slot{--dnl-shadow:0 2px 24px rgba(255,255,25
 
         // 场景
         const key = `${track.raw || ''}`;
-        if (force || key !== sceneKey) {
+        const songChanged = force || key !== sceneKey;
+
+        // 短间隔防抖：两句之间如果太近（默认 500ms 以内），这一句不换位置、不换样式，
+        // 只在原地把文字换掉 —— 否则连词/快歌会一直在滑来滑去、样式也一直在重播。
+        const startTs = Number(lyricRef?.startTs);
+        const nowReal = Date.now();
+        const gapByTs = Number.isFinite(startTs) && Number.isFinite(lastUnitStartTs)
+          ? startTs - lastUnitStartTs : Infinity;
+        const gapByArrival = lastUnitAt ? nowReal - lastUnitAt : Infinity;
+        const gap = Math.min(gapByTs, gapByArrival);
+        // 换歌/改设置时不防抖：那是自然的"重新落位"时机
+        const rapid = !songChanged && gap >= 0 && gap < moveDebounce(cfg);
+
+        if (songChanged) {
           sceneKey = key;
           scene = pickScene(track, cfg);
         }
-        if (cfg.reshuffle === 'line' && shown.kind) {
-          const pool = scenePool(cfg);
-          const li = payload.lyric?.index ?? 0;
-          scene.effect = pool[hash(`${track.raw}|${li}`) % pool.length];
-          if (cfg.band === 'auto' || cfg.align === 'auto') repickAnchor(scene, hash(`${track.raw}|pos|${li}`));
-        } else if (cfg.reshuffle === 'auto' && scene) {
-          // 顺序轮换（不是随机）：从本歌的种子位置开始，每 30 秒前进一个，
-          // 保证一首歌里能把效果池走一遍，而不会像随机那样反复撞同一个效果。
-          const pool = scenePool(cfg);
-          const step = Math.floor(Date.now() / 30000);
-          scene.effect = pool[(scene.base + step) % pool.length];
-          // 自动对齐下，轮换时顺便换个落点 —— 配合缓动方程滑过去，得到"活泼"的观感
-          if (cfg.band === 'auto' || cfg.align === 'auto') repickAnchor(scene, hash(`${track.raw}|pos|${step}`));
+        if (!rapid) {
+          if (cfg.reshuffle === 'line' && shown.kind) {
+            const pool = scenePool(cfg);
+            const li = payload.lyric?.index ?? 0;
+            scene.effect = pool[hash(`${track.raw}|${li}`) % pool.length];
+            if (cfg.band === 'auto' || cfg.align === 'auto') repickAnchor(scene, hash(`${track.raw}|pos|${li}`));
+          } else if (cfg.reshuffle === 'auto' && scene) {
+            // 顺序轮换（不是随机）：从本歌的种子位置开始，每 30 秒前进一个，
+            // 保证一首歌里能把效果池走一遍，而不会像随机那样反复撞同一个效果。
+            const pool = scenePool(cfg);
+            const step = Math.floor(Date.now() / 30000);
+            scene.effect = pool[(scene.base + step) % pool.length];
+            // 自动对齐下，轮换时顺便换个落点 —— 配合缓动方程滑过去，得到"活泼"的观感
+            if (cfg.band === 'auto' || cfg.align === 'auto') repickAnchor(scene, hash(`${track.raw}|pos|${step}`));
+          }
         }
 
         const pal = scene.palette;
@@ -769,21 +798,24 @@ body:not([data-ds-dark-theme]) .dnl-slot{--dnl-shadow:0 2px 24px rgba(255,255,25
         if (force || unitKey !== shown.key) {
           shown = { key: unitKey, kind, text };
           shownTranslation = false;
-          entranceAt = performance.now();
+          // 短间隔里不重播入场：文字直接换掉（rapid 时把入场时间推到很久以前 → --dnl-in 直接为 1）
+          entranceAt = rapid ? performance.now() - 1e6 : performance.now();
           idleSince = Date.now();
+          lastUnitAt = nowReal;
+          lastUnitStartTs = Number.isFinite(startTs) ? startTs : NaN;
           if (text) {
             // 减少动态效果：不锁死成某一种效果（那会让"永远只有 karaoke"），
             // 而是保留场景、只把运动关掉（data-calm 由 CSS 处理）。
             slot.dataset.calm = reducedMotion() && cfg.respectReducedMotion !== false ? '1' : '0';
             const eff = longLineFallback(text, scene.effect);
             buildLine(text, eff, [...text].length);
-            if (eff === 'rain' && prevText && slot.dataset.calm !== '1') spawnDrops(prevText);
+            if (eff === 'rain' && prevText && slot.dataset.calm !== '1' && !rapid) spawnDrops(prevText);
             prevText = text;
           }
         }
 
-        // 自动对齐下的缓动滑动：落点变了就用当前这套缓动方程滑过去
-        if (text) maybeGlide(scene.band, scene.align, cfg, scene.motionSeed ?? scene.seed);
+        // 自动对齐下的缓动滑动：落点变了就用当前这套缓动方程滑过去（短间隔不滑）
+        if (text && !rapid) maybeGlide(scene.band, scene.align, cfg, scene.motionSeed ?? scene.seed);
 
         // 译文小字（stacked）
         if (sub && mode === 'stacked') {

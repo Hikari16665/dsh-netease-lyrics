@@ -67,6 +67,19 @@
 `outQuint` / `inOutCubic`，由轮换种子决定）。位移写在专门的 `.dnl-glide` 层上（逐帧 rAF 写 CSS 变量），
 不碰各特效自己写在 `.dnl-slot` 上的 transform，所以不会打架。设置：`autoGlide`、`glideMs`（默认 900ms）。
 
+### 短间隔防抖
+
+相邻两句挨得太近时（连词、快歌），如果每句都重新选位、重新滑、重播入场，画面会一直在抖。所以：
+
+- 判定间隔取 **两个信号的较小值**：`startTs` 差（歌里的时间）与到达时间差（`Date.now()`）。
+  任一小于 `moveDebounceMs`（默认 500ms，可设 0 关闭）即视为"短间隔"。
+- 短间隔时**不换效果**（跳过 `reshuffle` 的轮换与落点重抽）、**不启动滑动**（跳过 `maybeGlide`）、
+  **不重播入场**（把 `entranceAt` 往前推，`--dnl-in` 直接为 1），也不重摆字雨粒子；只 `buildLine` 换字。
+- **换歌**（`track.raw` 变化）与**改设置**（`force`）不防抖 —— 那是自然的重新落位时机。
+- 视觉状态（`dx`/`dy`、`slot.dataset.fx`、配色变量）在短间隔里保持不变，所以文字是"原地换掉"。
+- 调试：`.dnl-glide` 上有 `data-glides`（启动过几次滑动）与 `data-ease`（上次用的缓动曲线），
+  防抖生效时 `data-glides` 不涨。
+
 **玻璃化** `glassMode`：默认 `auto` —— 面板不透明时把外壳面板临时调半透明（`glassStrength` 可调），
 否则歌词会被不透明面板挡住；设为 `off` 则保持面板原样（歌词只在框架间隙可见）。停用/卸载时会逐条还原主题令牌。
 
@@ -128,10 +141,10 @@ test/             四套测试 + 两个离线渲染台
 ## 测试与离线渲染台
 
 ```powershell
-npm test                            # 全部四套（最多 154 项断言）
+npm test                            # 全部四套（最多 166 项断言）
 node test/pairing.test.mjs        # 18 项：配对状态机（真机回放、歌名卡片回溯过滤）
 node test/inject-policy.test.mjs  # 14 项：注入时机、冷却、僵尸通道判定
-node test/client.test.mjs         # 92 项：四种 pairMode、效果轮换、缓动滑动、逐字可读性、快歌适配、减少动态、玻璃化、齿轮面板、回收
+node test/client.test.mjs         # 104 项：四种 pairMode、效果轮换、缓动滑动、短间隔防抖、逐字可读性、快歌适配、减少动态、玻璃化、齿轮面板、回收
 node test/host.test.mjs           # 30 项：真实 helper、路由、SSE、配置接口与校验、回收（无播放时 3 项跳过并报出）
 ```
 

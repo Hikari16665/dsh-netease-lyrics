@@ -445,7 +445,8 @@ console.log('== 自动对齐下的缓动滑动 ==');
     config: { ...basePayload().config, band: 'auto', align: 'auto', autoGlide: true, glideMs: 800, reshuffle: 'line', effectPool: ['karaoke', 'typewriter', 'blurReveal'], ...over },
   });
   // line 模式每句换落点，最方便观测
-  const pushLine = (i) => { const p = autoCfg(); p.lyric = { ...p.lyric, index: i }; push(p); tick(); };
+  // 每句之间推进 600ms：模拟正常节奏（超过默认 500ms 短句防抖）
+  const pushLine = (i) => { nowMs += 600; const p = autoCfg(); p.lyric = { ...p.lyric, index: i }; push(p); tick(); };
 
   pushLine(1); tick();
   const startX = gdx(), startY = gdy();
@@ -496,6 +497,7 @@ console.log('== 自动对齐下的缓动滑动 ==');
   // 缓动方程本身：抽到"回弹/弹性"这类 overshoot 曲线时，过程中应冲过目标点再回落
   let overshootSeen = false, easeNames = new Set(), overshootTried = 0;
   for (let i = 90; i < 140 && !overshootSeen; i++) {
+    nowMs += 700;
     const p = autoCfg({ reshuffle: 'line', band: 'auto', align: 'auto' });
     p.lyric = { ...p.lyric, index: i };
     push(p); tick();
@@ -513,6 +515,7 @@ console.log('== 自动对齐下的缓动滑动 ==');
     const p2 = autoCfg({ reshuffle: 'line', band: 'auto', align: 'auto' });
     p2.lyric = { ...p2.lyric, index: i };
     // 重新跑一遍，逐帧采样看有没有越过终点
+    nowMs += 700;
     push(p2); tick();
     for (let k = 0; k < 14; k++) {
       tick(40);
@@ -618,6 +621,79 @@ console.log('== 快歌适配：入场与揭示必须在句子结束前完成（�
   check('短句时配置值被 35% 上限压缩（560ms 已完成）', inVal() >= 0.99, String(inVal()));
 }
 
+console.log('== 短间隔防抖（连词/快歌时只原位换字）==');
+{
+  const rapidCfg = (over = {}) => basePayload({
+    config: {
+      ...basePayload().config,
+      band: 'auto', align: 'auto', autoGlide: true, glideMs: 800,
+      moveDebounceMs: 500, reshuffle: 'line',
+      effectPool: ['karaoke', 'typewriter', 'blurReveal', 'neonPulse'],
+      ...over,
+    },
+  });
+  const lineAt = (idx, startTs, over = {}) => {
+    const p = rapidCfg(over);
+    p.lyric = { ...p.lyric, index: idx, startTs, endTs: startTs + 1600, original: { text: `第${idx}句`, ts: '' } };
+    return p;
+  };
+  const glides = () => Number(glideEl().dataset.glides || 0);
+  const settle = (n = 15) => { for (let i = 0; i < n; i++) tick(100); };
+
+  const T = 2_000_000;
+  nowMs = T;
+  push(lineAt(1, T)); tick();
+  settle();                                   // 让第一句的滑动走完
+  const settledX = gdx(), settledY = gdy();
+  const g0 = glides();
+  const fx0 = slot().dataset.fx;
+  check('正常节奏会启动滑动', g0 > 0, String(g0));
+
+  // 把时钟拨回"第一句之后 300ms"，构造短间隔（视觉状态仍是已落位）
+  nowMs = T + 300;
+  push(lineAt(2, T + 300)); tick();
+  check('短间隔时不启动新的滑动', glides() === g0, `${g0} -> ${glides()}`);
+  check('短间隔时文字已更新', main().textContent === '第2句', main().textContent);
+  check('短间隔时保持同样样式（效果不变）', slot().dataset.fx === fx0, fx0 + ' -> ' + slot().dataset.fx);
+  check('短间隔时不重播入场（--dnl-in 直接为 1）', parseFloat(slot().style.getPropertyValue('--dnl-in')) >= 0.99,
+    slot().style.getPropertyValue('--dnl-in'));
+  check('短间隔时不移动（仍在原落点）', Math.abs(gdx() - settledX) < 0.01 && Math.abs(gdy() - settledY) < 0.01,
+    `${gdx()},${gdy()} vs ${settledX},${settledY}`);
+
+  // 连续 300ms 连击（连词/快歌）
+  for (let k = 3; k <= 6; k++) { nowMs += 300; push(lineAt(k, nowMs)); tick(); }
+  check('连续连词全程不启动滑动', glides() === g0, `${g0} -> ${glides()}`);
+  check('连词期间文字每次都更新', main().textContent === '第6句', main().textContent);
+  check('连词期间位置不动', Math.abs(gdx() - settledX) < 0.01 && Math.abs(gdy() - settledY) < 0.01, `${gdx()},${gdy()}`);
+
+  // 停下来（> 500ms）之后恢复移动
+  nowMs += 1200;
+  push(lineAt(9, nowMs)); tick();
+  check('间隔恢复后重新启动滑动', glides() === g0 + 1, `${g0} -> ${glides()}`);
+  settle();
+
+  // 防抖设为 0：短间隔也照滑
+  const g1 = glides();
+  nowMs += 300;
+  push(lineAt(10, nowMs, { moveDebounceMs: 0 })); tick();
+  check('防抖设为 0 时不再拦截', glides() === g1 + 1, `${g1} -> ${glides()}`);
+  settle();
+
+  // 换歌：自然的重新落位时机，即使间隔很短
+  const g2 = glides();
+  nowMs += 200;
+  const p6 = lineAt(11, nowMs);
+  p6.track = { raw: '另一首歌 - 别人', song: '另一首歌', artist: '别人' };
+  push(p6); tick();
+  check('换歌时不防抖（立刻重新落位）', glides() === g2 + 1, `${g2} -> ${glides()}`);
+  settle();
+
+  // 复位到固定对齐，避免影响后续用例
+  nowMs += 1000;
+  const back = basePayload({ config: { ...basePayload().config, band: 'bottom', align: 'center', autoGlide: false, moveDebounceMs: 500 } });
+  back.lyric = { ...back.lyric, index: 900, startTs: nowMs, endTs: nowMs + 4000 };
+  push(back); tick(); tick();
+}
 console.log('== 回收 ==');
 for (const d of cleanupFns) d();
 check('层已从 body 移除', layer().removed === true || bodyEl.findClass('dnl-layer').length === 0);
