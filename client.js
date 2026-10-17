@@ -155,11 +155,12 @@ body:not([data-ds-dark-theme]) .dnl-slot{--dnl-shadow:0 2px 24px rgba(255,255,25
 
 /* ── 状态提示（唯一可点击元素） ── */
 .dnl-hint{position:absolute;right:max(2vw,18px);bottom:max(2vh,14px);display:flex;gap:10px;align-items:center;
-  pointer-events:auto;font-size:12.5px;line-height:1.5;color:var(--dsw-alias-label-secondary,#a8adb8);
+  /* 默认不吃点击：它挂在高层的 .dnl-ui 里，隐藏时若仍 pointer-events:auto 会挡住右下角的输入区 */
+  pointer-events:none;font-size:12.5px;line-height:1.5;color:var(--dsw-alias-label-secondary,#a8adb8);
   background:color-mix(in srgb,var(--dsw-alias-bg-layer-1,#151517) 78%,transparent);
   border:1px solid var(--dsw-alias-border-l1,rgba(255,255,255,.12));border-radius:10px;padding:7px 11px;
   backdrop-filter:blur(10px);opacity:0;transform:translateY(6px);transition:opacity .35s ease,transform .35s ease}
-.dnl-hint[data-show="1"]{opacity:.94;transform:none}
+.dnl-hint[data-show="1"]{opacity:.94;transform:none;pointer-events:auto}
 .dnl-hint button{pointer-events:auto;font:inherit;color:var(--dsw-alias-label-primary,#f2f3f5);cursor:pointer;
   background:color-mix(in srgb,var(--dnl-c1, #5b8cff) 24%,transparent);
   border:1px solid color-mix(in srgb,var(--dnl-c1, #5b8cff) 40%,transparent);
@@ -272,7 +273,9 @@ body:not([data-ds-dark-theme]) .dnl-slot{--dnl-shadow:0 2px 24px rgba(255,255,25
       stage.appendChild(glideEl);
       const hint = document.createElement('div');
       hint.className = 'dnl-hint';
-      layer.append(stage, hint);
+      // 提示条不能挂在歌词层里：那一层是 z-index:-1，看得见但点击永远落在上层应用上（点不到）。
+      // 它和齿轮/面板一起放进下面的 .dnl-ui 高层容器。
+      layer.append(stage);
       document.body.appendChild(layer);
 
       // ── 自带设置：齿轮 + 面板（显示类立即生效并存 localStorage；宿主侧参数同步到 /config） ──
@@ -343,7 +346,7 @@ body:not([data-ds-dark-theme]) .dnl-slot{--dnl-shadow:0 2px 24px rgba(255,255,25
       panel.dataset.open = '0';
       const ui = document.createElement('div');
       ui.className = 'dnl-ui';
-      ui.append(gear, panel);
+      ui.append(hint, gear, panel);
       document.body.appendChild(ui);
       gear.addEventListener('click', (e) => {
         e.stopPropagation();

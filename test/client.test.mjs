@@ -254,6 +254,16 @@ push(basePayload({ channel: { state: 'attached', desktopLyrics: 0, visible: 0 } 
 tick();
 check('未开桌面歌词时给出提示', hint().dataset.show === '1' && hint().textContent.includes('桌面歌词'), hint().textContent);
 
+console.log('== 提示条的可点击性（回归：提示条点不到）==');
+{
+  const CSS_SRC = readFileSync(join(HERE, '..', 'client.js'), 'utf8');
+  const uiEl = bodyEl.findClass('dnl-ui')[0];
+  check('提示条挂在高层容器 .dnl-ui 里（不是 z-index:-1 的歌词层）', !!uiEl && uiEl.contains(hint()));
+  check('歌词层里不再有提示条', layer().findClass('dnl-hint').length === 0);
+  check('提示条默认不吃点击（隐藏时不挡输入区）', /\.dnl-hint\{[^}]*pointer-events:none/.test(CSS_SRC));
+  check('提示条显示时才接收点击', /\.dnl-hint\[data-show="1"\]\{[^}]*pointer-events:auto/.test(CSS_SRC));
+  check('提示条的按钮可点', /\.dnl-hint button\{[^}]*pointer-events:auto/.test(CSS_SRC));
+}
 console.log('== 空闲淡出与总开关 ==');
 push(basePayload({ config: { ...basePayload().config, idleFadeSec: 1 } }));
 tick(); tick();
