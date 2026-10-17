@@ -50,21 +50,35 @@ t('入参为空也不抛错', () => {
   assert.equal(shouldAttemptInject(undefined).attempt, false);
 });
 
-console.log('== isStaleChannel ==');
+console.log('== isStaleChannel（按写入活动判定，不看「多久没出新歌词」）==');
 t('窗口不在 → 不算僵死', () => {
-  assert.equal(isStaleChannel({ desktopLyrics: 0, lastLineAt: NOW - 10 * DEFAULT_STALE_MS, now: NOW }), false);
+  assert.equal(isStaleChannel({ desktopLyrics: 0, lastWriteAt: NOW - 10 * DEFAULT_STALE_MS, now: NOW }), false);
 });
-t('从没见过歌词 → 不算僵死（可能只是没播放）', () => {
-  assert.equal(isStaleChannel({ desktopLyrics: 1, lastLineAt: 0, now: NOW }), false);
+t('从没见过写入活动 → 不算僵死（可能只是没播放）', () => {
+  assert.equal(isStaleChannel({ desktopLyrics: 1, lastWriteAt: 0, now: NOW }), false);
 });
-t('刚有歌词 → 不算僵死', () => {
-  assert.equal(isStaleChannel({ desktopLyrics: 1, lastLineAt: NOW - 5000, now: NOW }), false);
+t('刚有写入活动 → 不算僵死', () => {
+  assert.equal(isStaleChannel({ desktopLyrics: 1, lastWriteAt: NOW - 5000, now: NOW }), false);
 });
-t('窗口在但长时间无歌词 → 判定僵死', () => {
-  assert.equal(isStaleChannel({ desktopLyrics: 1, lastLineAt: NOW - DEFAULT_STALE_MS - 1, now: NOW }), true);
+t('窗口在但长时间没有任何写入 → 判定僵死', () => {
+  assert.equal(isStaleChannel({ desktopLyrics: 1, lastWriteAt: NOW - DEFAULT_STALE_MS - 1, now: NOW }), true);
 });
-t('入参为空也不抛错', () => {
-  assert.equal(isStaleChannel(undefined), false);
+console.log('== 回归：通道活着却被报「已断开」 ==');
+t('重绘心跳刷新过活动 → 不算僵死（很久没有新歌词也一样）', () => {
+  // line 事件很久没来（同一句被反复重绘），但 tick 一直在刷新活动时间
+  assert.equal(isStaleChannel({ desktopLyrics: 1, lastWriteAt: NOW - 3000, now: NOW }), false);
+});
+t('活动刚好超过阈值 → 判定僵死', () => {
+  assert.equal(isStaleChannel({ desktopLyrics: 1, lastWriteAt: NOW - DEFAULT_STALE_MS - 1, now: NOW }), true);
+});
+t('阈值保守到 180 秒：暂停/长间奏不会立刻报断开', () => {
+  assert.ok(DEFAULT_STALE_MS >= 180000, String(DEFAULT_STALE_MS));
+  assert.equal(isStaleChannel({ desktopLyrics: 1, lastWriteAt: NOW - 120000, now: NOW }), false);
+});
+t('idleSecs 不再参与判定（helper 只在状态变化时上报，是旧快照）', () => {
+  // 传了 idleSecs 也不影响结果：只看 lastWriteAt
+  assert.equal(isStaleChannel({ desktopLyrics: 1, idleSecs: 0, lastWriteAt: NOW - DEFAULT_STALE_MS - 1, now: NOW }), true);
+  assert.equal(isStaleChannel({ desktopLyrics: 1, idleSecs: 9999, lastWriteAt: NOW - 1000, now: NOW }), false);
 });
 
 console.log(`\n通过 ${pass} 项，失败 ${fail} 项`);

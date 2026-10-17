@@ -13,7 +13,7 @@
  * 由页面提示给出「重试注入」按钮。
  */
 export const DEFAULT_COOLDOWN_MS = 60000; // 两次自动注入尝试的最小间隔
-export const DEFAULT_STALE_MS = 90000;    // 桌面歌词窗口在、却这么久没有新歌词 → 判定通道僵死
+export const DEFAULT_STALE_MS = 180000;   // 桌面歌词窗口在、却这么久没有任何写入活动 → 判定通道僵死
 
 /** 是否应该自动注入 */
 export function shouldAttemptInject(input) {
@@ -38,10 +38,19 @@ export function shouldAttemptInject(input) {
   return { attempt: false, reason: 'writer present' };
 }
 
-/** 通道是否已经僵死（写入端静默消失）——用于给用户一个手动重试的入口 */
+/**
+ * 通道是否已经僵死（写入端静默消失）——用于给用户一个手动重试的入口。
+ *
+ * 判定用的是**写入端的活动**（新歌词 `line` 或重绘心跳 `tick`），不是「多久没出新歌词」：
+ * 同一句词被反复重绘、长间奏都会让「没有新歌词」变久，但写入端一直活着 —— 只按新歌词判定
+ * 会误报「通道已断开」。注意不能用 status 里的 `idleSecs`：helper 只在窗口/可见性/句柄
+ * 变化时才上报它，宿主拿到的是旧快照，按它会永久压掉该出现的提示。
+ *
+ * 剩下的歧义（网易云暂停时两边都静默）无法只靠这里区分，所以阈值取得保守（默认 180s）。
+ */
 export function isStaleChannel(input) {
-  const { desktopLyrics = 0, lastLineAt = 0, now = Date.now(), staleMs = DEFAULT_STALE_MS } = input ?? {};
+  const { desktopLyrics = 0, lastWriteAt = 0, now = Date.now(), staleMs = DEFAULT_STALE_MS } = input ?? {};
   if (!(desktopLyrics > 0)) return false;
-  if (!lastLineAt) return false;
-  return now - lastLineAt > staleMs;
+  if (!lastWriteAt) return false;
+  return now - lastWriteAt > staleMs;
 }

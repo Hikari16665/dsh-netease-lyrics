@@ -264,6 +264,21 @@ console.log('== 提示条的可点击性（回归：提示条点不到）==');
   check('提示条显示时才接收点击', /\.dnl-hint\[data-show="1"\]\{[^}]*pointer-events:auto/.test(CSS_SRC));
   check('提示条的按钮可点', /\.dnl-hint button\{[^}]*pointer-events:auto/.test(CSS_SRC));
 }
+console.log('== 通道僵死提示（措辞不武断，按钮可用）==');
+{
+  const withChannel = (ch) => basePayload({ channel: { state: 'attached', desktopLyrics: 1, visible: 1, lines: 100, ...ch } });
+
+  // 宿主标 stale → 给提示与按钮，但文案要承认"可能只是暂停"
+  push(withChannel({ stale: true, idleSecs: 0 })); tick();
+  check('宿主标 stale 时给出提示', hint().dataset.show === '1', hint().textContent);
+  check('提示文案不武断（提到可能只是暂停）', hint().textContent.includes('暂停'), hint().textContent);
+  check('提示里给了「重新注入」按钮', hint().children.some((c) => c.tagName === 'BUTTON' && c.textContent.includes('重新注入')),
+    hint().textContent);
+
+  // 宿主没标 stale → 不提示
+  push(withChannel({ stale: false, idleSecs: 300 })); tick();
+  check('宿主未标 stale → 不提示', hint().dataset.show !== '1', hint().textContent);
+}
 console.log('== 空闲淡出与总开关 ==');
 push(basePayload({ config: { ...basePayload().config, idleFadeSec: 1 } }));
 tick(); tick();

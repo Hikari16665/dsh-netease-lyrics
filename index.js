@@ -146,7 +146,8 @@ export function apply(ctx, config) {
   let lastPush = 0;
   let injectState = { status: 'idle', message: '', stagedDir: stageDir, manualScript: join(stageDir, 'install-hook.cmd') };
   let lastInjectAt = 0;
-  let lastLineAt = 0;
+  let lastLineAt = 0;     // 最近一次「新歌词」
+  let lastWriteAt = 0;    // 最近一次写入端活动（新歌词或重绘心跳）
   let prevDlHwnd = '';
   let lastSig = '';
   let configRevision = 0;
@@ -209,7 +210,10 @@ export function apply(ctx, config) {
     try { ev = JSON.parse(text); } catch { return; }
     ev._at = Date.now();
     lastEventAt = ev._at;
-    if (ev.type === 'line') lastLineAt = ev._at;
+    // 写入端活动：新歌词（line）与「同一句被重绘」（tick）都算写了一次。
+    // 只看 line 会在一句长词/间奏/暂停时误判僵死；而 status 里的 idleSecs 是 helper 的旧快照
+    // （只在窗口/可见性/句柄变化时才上报），不能当作活信号。
+    if (ev.type === 'line' || ev.type === 'tick') { lastLineAt = ev._at; lastWriteAt = ev._at; }
     state.pushEvent(ev);
     if (ev.type === 'status') {
       const verdict = shouldAttemptInject({
@@ -313,7 +317,12 @@ export function apply(ctx, config) {
       ...base,
       channel: {
         ...base.channel,
-        stale: isStaleChannel({ desktopLyrics: base.channel.desktopLyrics, lastLineAt, now }),
+        // 用写入端的活动（新歌词或重绘心跳）判定僵死，而不是「多久没出新歌词」
+        stale: isStaleChannel({
+          desktopLyrics: base.channel.desktopLyrics,
+          lastWriteAt,
+          now,
+        }),
       },
       connected: base.channel.state === 'attached',
       pluginVersion: PLUGIN_VERSION,

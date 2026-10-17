@@ -921,9 +921,10 @@ body:not([data-ds-dark-theme]) .dnl-slot{--dnl-shadow:0 2px 24px rgba(255,255,25
           actions = [['复制脚本路径', 'copy'], ['打开文件夹', 'reveal'], ['重试注入', 'inject']];
         } else if (ch.state !== 'attached') { text = '等待歌词通道…'; }
         else if (!ch.desktopLyrics) { text = '请在网易云音乐里打开「桌面歌词」'; }
-        else if (ch.stale) {
-          text = '歌词通道似乎已断开（网易云可能重启过）';
-          actions = [['重试注入', 'inject'], ['打开文件夹', 'reveal']];
+        else if (ch.stale === true) {
+          // 写死"已断开"会骗人：暂停播放/长间奏时写入端本来就安静，所以把话说明白，按钮照给
+          text = '很久没有新歌词了（可能只是暂停）；若网易云重启过，点「重新注入」';
+          actions = [['重新注入', 'inject'], ['打开文件夹', 'reveal']];
         }
         else if (inj.status === 'failed') { text = `注入失败：${inj.message || ''}`; actions = [['重试注入', 'inject'], ['打开文件夹', 'reveal']]; }
         hint.textContent = '';
